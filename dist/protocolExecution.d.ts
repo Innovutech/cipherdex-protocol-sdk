@@ -1,0 +1,67 @@
+import { PROTOCOL_ABIS } from './protocolAbi.js';
+import { Address, Hex, ProtocolCodec } from './protocolData.js';
+import { VerifiedBundle, VerifiedPool } from './poolIdentity.js';
+export type ProtocolCall = Readonly<{
+    chainId: bigint;
+    from: Address;
+    to: Address;
+    abi: readonly string[];
+    functionName: string;
+    args: readonly unknown[];
+    data: Hex;
+    value: bigint;
+    gasLimit?: bigint;
+}>;
+export type CallContext = Readonly<{
+    bundle: VerifiedBundle;
+    candidates: readonly VerifiedPool[];
+    tokenIn: Address;
+    tokenOut: Address;
+    kind: 'public-quote' | 'public-swap' | 'native-input' | 'native-output' | 'confidential-quote' | 'confidential-swap' | 'position';
+    recipient?: Address;
+    requestId?: Hex;
+    amountIn?: bigint;
+    minimumOut?: bigint;
+    liquidity?: LiquidityContext;
+}>;
+export type LiquidityContext = Readonly<{
+    poolAddress: Address;
+    key: Hex;
+    label: keyof typeof PROTOCOL_ABIS;
+    eventName?: string;
+    result: 'creation' | 'deposit' | 'removal' | 'success' | 'ciphertexts' | 'lock' | 'unlock' | 'claim';
+    creationArgs?: readonly unknown[];
+    instance?: boolean;
+    native?: boolean;
+    operation?: bigint;
+    maximums?: readonly bigint[];
+    minimums?: readonly bigint[];
+    minimumShares?: bigint;
+    shareAmount?: bigint;
+    requestId?: Hex;
+    token0Specified?: boolean;
+    side?: bigint;
+    lockId?: Hex;
+    unlockTime?: bigint;
+    permanent?: boolean;
+}>;
+export declare function context(call: ProtocolCall): CallContext;
+export declare function makeCall(codec: ProtocolCodec, label: keyof typeof PROTOCOL_ABIS, b: VerifiedBundle, from: Address, to: Address, functionName: string, args: readonly unknown[], value: bigint, ctx: CallContext, gasLimit?: bigint): ProtocolCall;
+/** INTERNAL encoding primitive; public builders separately brand authentication. */
+export declare function encodeProtocolCall(codec: ProtocolCodec, label: keyof typeof PROTOCOL_ABIS, chainId: bigint, from: Address, to: Address, functionName: string, args: readonly unknown[], value: bigint, gasLimit?: bigint): ProtocolCall;
+export type SwapInput = Readonly<{
+    caller: Address;
+    tokenIn: Address;
+    tokenOut: Address;
+    amountIn: bigint;
+    minimumOut: bigint;
+    candidates: readonly VerifiedPool[];
+    recipient: Address;
+    deadline: bigint;
+    currentAllowance: bigint;
+    gasLimit?: bigint;
+}>;
+export declare function deadline(b: VerifiedBundle, v: unknown): bigint;
+export declare function recipient(b: VerifiedBundle, v: unknown, candidates: readonly VerifiedPool[], native?: boolean): Address;
+export declare function gas(input: unknown): bigint | undefined;
+export declare function winner(call: ProtocolCall, value: unknown): VerifiedPool;

@@ -1,0 +1,81 @@
+import { execFileSync } from "node:child_process";
+import {
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const expectedDirectory = join(repository, "dist");
+const temporaryDirectory = mkdtempSync(join(tmpdir(), "cipherdex-sdk-"));
+const compiler = realpathSync(join(
+  repository,
+  "node_modules",
+  "typescript",
+  "bin",
+  "tsc",
+));
+const expectedCompilerRoot = realpathSync(join(
+  repository,
+  "node_modules",
+  "typescript",
+));
+if (!compiler.startsWith(`${expectedCompilerRoot}${sep}`)) {
+  throw new Error("SDK distribution check resolved an untrusted TypeScript compiler");
+}
+
+function files(directory, root = directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) return files(path, root);
+    if (!entry.isFile()) return [];
+    return [relative(root, path).replaceAll("\\", "/")];
+  }).sort();
+}
+
+try {
+  execFileSync(process.execPath, [
+    compiler,
+    "-p",
+    join(repository, "tsconfig.build.json"),
+    "--outDir",
+    temporaryDirectory,
+  ], {
+    cwd: repository,
+    env: {
+      PATH: process.env.PATH ?? "",
+      SystemRoot: process.env.SystemRoot ?? "",
+    },
+    stdio: "inherit",
+    windowsHide: true,
+  });
+
+  const expectedFiles = files(expectedDirectory);
+  const generatedFiles = files(temporaryDirectory);
+  if (JSON.stringify(expectedFiles) !== JSON.stringify(generatedFiles)) {
+    throw new Error("SDK distribution file set is stale; run npm run build");
+  }
+  for (const file of generatedFiles) {
+    const expected = readFileSync(join(expectedDirectory, file), "utf8")
+      .replaceAll("\r\n", "\n");
+    const generated = readFileSync(join(temporaryDirectory, file), "utf8")
+      .replaceAll("\r\n", "\n");
+    if (expected !== generated) {
+      throw new Error(`SDK distribution is stale: ${file}; run npm run build`);
+    }
+  }
+  console.log(`SDK distribution matches ${generatedFiles.length} generated files.`);
+} finally {
+  const cleanupRoot = realpathSync(tmpdir());
+  const cleanupTarget = realpathSync(temporaryDirectory);
+  const cleanupRelative = relative(cleanupRoot, cleanupTarget);
+  if (!cleanupRelative || cleanupRelative.startsWith("..") || cleanupRelative.includes(sep) || !cleanupRelative.startsWith("cipherdex-sdk-")) {
+    throw new Error("Unsafe SDK temporary cleanup path");
+  }
+  rmSync(cleanupTarget, { recursive: true, force: true });
+}
