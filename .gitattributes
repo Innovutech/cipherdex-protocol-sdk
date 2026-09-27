@@ -1,0 +1,2 @@
+# Preserve the reviewed canonical manifest, including its final newline.
+/deployments/coti-mainnet-generation-5fbf92a55fbd61914bd34fd69d4b20340be0d2dc.json -text

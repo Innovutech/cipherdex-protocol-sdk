@@ -26,7 +26,71 @@ import {
 } from '@cipherdex/protocol-sdk/protocol';
 ```
 
-Obtain the exact reviewed deployment manifest and independent trust anchors separately. This SDK does not ship deployment records or treat an arbitrary manifest's own hashes as trusted. Parsing a manifest alone does not authenticate a deployment. Use the helpers documented below with your injected adapters.
+## Included Mainnet manifest
+
+The [authoritative Mainnet deployment manifest](deployments/coti-mainnet-generation-5fbf92a55fbd61914bd34fd69d4b20340be0d2dc.json) is temporarily mirrored here while the main protocol repository remains private. The exact original file is included in Git installs and npm tarballs. It covers **all three modes**, including **Mode 2**; use the complete manifest rather than extracting a mode-specific JSON document. This is a historical verified deployment observation, not a claim that mutable roles or live state are unchanged today.
+
+- Chain ID: **2632500** (`coti-mainnet`).
+- Exact UTF-8 file length: **64475 bytes**, including the final newline.
+- File SHA-256: `9f2702ce890a2c1dcfc35fe5e9266a1231098d0c10c047f2a4f2620a8ef6b2b7`.
+- Reviewed plan Keccak256: `0xdd116d25ae5c96c3e331b2e362737d2c16cac3f99e6fb20606264de461d03e01`.
+- Reviewed observed-manifest Keccak256: `0x1b7a6c0dab5e4d00f3d164a930434d72993f10e96c5829be469509842dec2104`.
+
+Pin these values in your application's reviewed configuration independently of downloaded JSON. A digest identifies reviewed bytes; neither the file nor its own hashes grants deployment trust or transaction authority.
+
+Read the exported package asset as **text**, preserving its canonical bigint encoding and final newline. For Node.js:
+
+```js
+import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+
+const manifestUrl = new URL(import.meta.resolve(
+  '@cipherdex/protocol-sdk/deployments/coti-mainnet.json',
+));
+const raw = await readFile(manifestUrl, 'utf8');
+if (createHash('sha256').update(raw, 'utf8').digest('hex') !==
+    '9f2702ce890a2c1dcfc35fe5e9266a1231098d0c10c047f2a4f2620a8ef6b2b7') {
+  throw new Error('Unexpected Mainnet manifest bytes');
+}
+```
+
+For browser applications, copy this same package asset to your application's static assets during the build and fetch it with `response.text()`. Verify its SHA-256 against the pinned value before parsing. Alternatively, retrieve the repository file at a reviewed **full SDK commit SHA**; avoid using a moving branch as a production trust anchor. Do not use `JSON.parse`/reserialization as a replacement for the canonical SDK parser.
+
+Use the existing SDK helpers to derive and then authenticate the chosen mode:
+
+```ts
+import {
+  parseDeploymentManifest, protocolPolicyFromObserved, verifyProtocolBundle,
+  type ManifestReview, type ManifestDigestAdapter,
+  type ProtocolReadAdapter, type Mode,
+} from '@cipherdex/protocol-sdk/protocol';
+
+const review: ManifestReview = {
+  expectedChainId: 2632500n,
+  environment: 'coti-mainnet',
+  planDigest: '0xdd116d25ae5c96c3e331b2e362737d2c16cac3f99e6fb20606264de461d03e01',
+  observedDigest: '0x1b7a6c0dab5e4d00f3d164a930434d72993f10e96c5829be469509842dec2104',
+};
+
+export async function authenticateMainnet(
+  raw: string,
+  reader: ProtocolReadAdapter,
+  digester: ManifestDigestAdapter,
+  mode: Mode = 2,
+) {
+  const manifest = parseDeploymentManifest(raw);
+  if (manifest.kind !== 'observed' || manifest.result !== 'verified') {
+    throw new Error('Completed observed manifest required');
+  }
+  const policy = protocolPolicyFromObserved(manifest, mode, review, digester);
+  return verifyProtocolBundle(reader, policy);
+}
+```
+
+Supply your reviewed read-only RPC adapter and a digester whose `hashUtf8` computes **Keccak256 of canonical UTF-8**, not SHA-256 or SHA3-256. The function defaults to Mode 2; pass 0 or 1 for the other modes. Live authentication checks code, chain and bindings at a consistent block. Deriving a policy alone is not live authentication, and this example does not sign or submit transactions.
+
+Component addresses and runtime hashes are in `manifest.components`: `mode0.*`, `mode1.*`, `mode2.*`, shared `registry`/LP issuers, `public.liquidity`, `public.nativeSwap`, `public.nativeLiquidity`, `public.orders` and `wrappedNative`. There is no `deployment.contracts` object.
+
 
 ## Development
 
@@ -42,7 +106,7 @@ npm run build
 npm pack --ignore-scripts
 ```
 
-The SDK source and all 60 distribution files originate from protocol repository snapshot `6adef7d1921a2556f099738198acc56e6e3d3c1c` without API changes. This repository starts with its own history. Protocol contracts, compiled Solidity artifacts, deployment/evidence records, funded runners, credentials and recovery journals are not included. ABI fragments/selectors/topics already exported by the SDK are included.
+The SDK source and all 60 distribution files originate from protocol repository snapshot `6adef7d1921a2556f099738198acc56e6e3d3c1c` without API changes. This repository starts with its own history. Only the reviewed Mainnet observed manifest is included as deployment data. Protocol contracts, compiled Solidity artifacts, other deployment/evidence records, funded runners, credentials and recovery journals are not included. ABI fragments/selectors/topics already exported by the SDK are included.
 
 ## License notices
 
@@ -577,7 +641,7 @@ The development-only `scripts/cipherdex-generation-plan.ts` and
 functions for reviewed adapters. They have no execution CLI, signer, broadcaster,
 RPC-provider construction or secret loader. Contract-role outputs require an
 integration-specific inner call; no generic wallet/controller ABI is assumed.
-Deployment planning reports and observed manifests are maintained separately from this SDK.
+Deployment planning reports are maintained separately; the current Mainnet observed manifest is included as described above.
 The Phase 5A report is historical. Current deployment/audit status is linked above.
 
 ## Historical package root: `@cipherdex/protocol-sdk`

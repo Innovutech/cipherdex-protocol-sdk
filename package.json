@@ -6,7 +6,8 @@
   "sideEffects": false,
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "deployments"
   ],
   "exports": {
     ".": {
@@ -18,7 +19,8 @@
       "types": "./dist/protocol.d.ts",
       "import": "./dist/protocol.js",
       "default": "./dist/protocol.js"
-    }
+    },
+    "./deployments/coti-mainnet.json": "./deployments/coti-mainnet-generation-5fbf92a55fbd61914bd34fd69d4b20340be0d2dc.json"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
